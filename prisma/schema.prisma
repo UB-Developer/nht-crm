@@ -1,0 +1,764 @@
+// Prisma schema for Hajj & Umrah CRM + ERP
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Branch {
+  id              String           @id @default(uuid())
+  name            String
+  code            String           @unique
+  city            String           // Karachi, Lahore, Islamabad, etc.
+  address         String?
+  phone           String?
+  email           String?
+  managerName     String?
+  isHeadOffice    Boolean          @default(false)
+  isDeleted       Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  users           User[]
+  customers       Customer[]
+  groups          Group[]
+  tickets         Ticket[]
+  hotelBookings   HotelBooking[]
+  packageBookings PackageBooking[]
+  accounts        Account[]
+  journalEntries  JournalEntry[]
+  payments        Payment[]
+  receipts        Receipt[]
+  refunds         Refund[]
+  expenses        Expense[]
+  auditLogs       AuditLog[]
+
+  @@index([city])
+  @@index([isDeleted])
+}
+
+model User {
+  id              String           @id @default(uuid())
+  name            String
+  email           String           @unique
+  passwordHash    String
+  phone           String?
+  role            String           @default("STAFF") // SUPER_ADMIN, ADMIN, BRANCH_MANAGER, ACCOUNTANT, TICKET_MANAGER, HOTEL_MANAGER, STAFF
+  branchId        String?
+  branch          Branch?          @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  commissionRate  Float            @default(0.0)
+  isActive        Boolean          @default(true)
+  isDeleted       Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  packageBookings PackageBooking[]
+  journalEntries  JournalEntry[]
+  payments        Payment[]
+  receipts        Receipt[]
+  approvedRefunds Refund[]         @relation("RefundApprover")
+  expenses        Expense[]
+  notifications   Notification[]
+  auditLogs       AuditLog[]
+
+  @@index([email])
+  @@index([role])
+  @@index([branchId])
+  @@index([isDeleted])
+}
+
+model Customer {
+  id              String           @id @default(uuid())
+  firstName       String
+  lastName        String
+  cnic            String?
+  phone           String
+  whatsapp        String?
+  email           String?
+  address         String?
+  city            String?
+  passportNumber  String?
+  familyHeadId    String?
+  branchId        String?
+  branch          Branch?          @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  notes           String?
+  isDeleted       Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  passports       Passport[]
+  groupPassengers GroupPassenger[]
+  tickets         Ticket[]
+  hotelBookings   HotelBooking[]
+  packageBookings PackageBooking[]
+  pilgrims        Pilgrim[]
+  visas           Visa[]
+  nusukRecords    Nusuk[]
+  receipts        Receipt[]
+  refunds         Refund[]
+  ledgerEntries   LedgerEntry[]
+
+  @@index([cnic])
+  @@index([phone])
+  @@index([passportNumber])
+  @@index([branchId])
+  @@index([isDeleted])
+}
+
+model Passport {
+  id              String           @id @default(uuid())
+  customerId      String
+  customer        Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  passportNumber  String           @unique
+  surname         String
+  givenNames      String
+  nationality     String           @default("PAK")
+  issueDate       DateTime
+  expiryDate      DateTime
+  dateOfBirth     DateTime
+  gender          String           // MALE, FEMALE
+  placeOfBirth    String?
+  countryOfIssue  String           @default("PAKISTAN")
+  passportScanUrl String?
+  photoUrl        String?
+  cnicScanUrl     String?
+  vaccineScanUrl  String?
+  isDeleted       Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  groupPassengers GroupPassenger[]
+  tickets         Ticket[]
+  pilgrims        Pilgrim[]
+  visas           Visa[]
+
+  @@index([customerId])
+  @@index([passportNumber])
+  @@index([expiryDate])
+  @@index([isDeleted])
+}
+
+model Airline {
+  id              String           @id @default(uuid())
+  name            String
+  code            String           @unique // SV, PK, PA, XY, QR, EK
+  logoUrl         String?
+  contactPhone    String?
+  contactEmail    String?
+  isDeleted       Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  routes          Route[]
+  flights         Flight[]
+  groups          Group[]
+  packages        Package[]
+
+  @@index([code])
+}
+
+model Route {
+  id              String           @id @default(uuid())
+  origin          String           // KHI, LHE, ISB
+  destination     String           // JED, MED
+  flightNumber    String?
+  airlineId       String
+  airline         Airline          @relation(fields: [airlineId], references: [id], onDelete: Cascade)
+  isDeleted       Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  flights         Flight[]
+  groups          Group[]
+
+  @@index([origin, destination])
+  @@index([airlineId])
+}
+
+model Flight {
+  id               String          @id @default(uuid())
+  airlineId        String
+  airline          Airline         @relation(fields: [airlineId], references: [id], onDelete: Cascade)
+  routeId          String
+  route            Route           @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  flightNumber     String
+  departureAirport String
+  arrivalAirport   String
+  departureTime    DateTime
+  arrivalTime      DateTime
+  baggageKg        Int             @default(30)
+  flightClass      String          @default("ECONOMY") // ECONOMY, BUSINESS
+  isDeleted        Boolean         @default(false)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  groups           Group[]
+  packages         Package[]
+
+  @@index([flightNumber])
+  @@index([departureTime])
+  @@index([airlineId])
+}
+
+model Supplier {
+  id              String           @id @default(uuid())
+  name            String
+  type            String           // AIRLINE, HOTEL, VISA, TRANSPORT, GENERAL
+  contactPerson   String?
+  phone           String?
+  email           String?
+  address         String?
+  balance         Float            @default(0.0)
+  isDeleted       Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  groups          Group[]
+  tickets         Ticket[]
+  hotelBookings   HotelBooking[]
+  visas           Visa[]
+  payments        Payment[]
+  refunds         Refund[]
+  ledgerEntries   LedgerEntry[]
+
+  @@index([type])
+  @@index([name])
+}
+
+model Group {
+  id                String           @id @default(uuid())
+  groupName         String
+  airlineId         String
+  airline           Airline          @relation(fields: [airlineId], references: [id], onDelete: Cascade)
+  routeId           String
+  route             Route            @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  flightId          String?
+  flight            Flight?          @relation(fields: [flightId], references: [id], onDelete: SetNull)
+  pnr               String
+  departureDate     DateTime
+  returnDate        DateTime
+  totalSeats        Int
+  seatsSold         Int              @default(0)
+  seatsBlocked      Int              @default(0)
+  seatCostPrice     Float
+  seatSellingPrice  Float
+  nameListDeadline DateTime
+  supplierId        String
+  supplier          Supplier         @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  branchId          String?
+  branch            Branch?          @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  status            String           @default("OPEN") // OPEN, CLOSED, CANCELLED
+  isDeleted         Boolean          @default(false)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  passengers        GroupPassenger[]
+  packages          Package[]
+
+  @@index([pnr])
+  @@index([departureDate])
+  @@index([status])
+  @@index([branchId])
+}
+
+model GroupPassenger {
+  id                String           @id @default(uuid())
+  groupId           String
+  group             Group            @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  customerId        String
+  customer          Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  passportId        String?
+  passport          Passport?        @relation(fields: [passportId], references: [id], onDelete: SetNull)
+  ticketNumber      String?
+  seatCostPrice     Float
+  seatSellingPrice  Float
+  status            String           @default("CONFIRMED") // CONFIRMED, CANCELLED, REFUNDED
+  isDeleted         Boolean          @default(false)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@index([groupId])
+  @@index([customerId])
+  @@index([status])
+}
+
+model Ticket {
+  id                String           @id @default(uuid())
+  type              String           @default("SINGLE") // SINGLE, GROUP
+  customerId        String
+  customer          Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  passportId        String?
+  passport          Passport?        @relation(fields: [passportId], references: [id], onDelete: SetNull)
+  supplierId        String
+  supplier          Supplier         @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  pnr               String
+  ticketNumber      String           @unique
+  routeDetails      String           // e.g. KHI-JED-KHI
+  departureDate     DateTime
+  returnDate        DateTime?
+  fare              Float
+  tax               Float            @default(0.0)
+  supplierCost      Float
+  sellingPrice      Float
+  profit            Float            @default(0.0)
+  branchId          String?
+  branch            Branch?          @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  status            String           @default("ISSUED") // ISSUED, REISSUED, CANCELLED, REFUNDED
+  isDeleted         Boolean          @default(false)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@index([ticketNumber])
+  @@index([pnr])
+  @@index([customerId])
+  @@index([branchId])
+}
+
+model Hotel {
+  id              String           @id @default(uuid())
+  name            String
+  city            String           // MAKKAH, MADINAH
+  stars           Int              @default(4) // 3, 4, 5
+  distanceMeters  Int              // Distance from Haram or Masjid-e-Nabawi in meters
+  address         String
+  contactPhone    String?
+  images          String?          // JSON or comma separated URLs
+  facilities      String?          // Wifi, Shuttle, Buffet, etc.
+  isDeleted       Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  rooms           Room[]
+  hotelBookings   HotelBooking[]
+  makkahPackages  Package[]        @relation("MakkahHotel")
+  madinahPackages Package[]        @relation("MadinahHotel")
+
+  @@index([city])
+  @@index([stars])
+  @@index([isDeleted])
+}
+
+model Room {
+  id              String           @id @default(uuid())
+  hotelId         String
+  hotel           Hotel            @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  roomType        String           // DOUBLE, TRIPLE, QUAD, QUINT, SHARING
+  totalRooms      Int              @default(10)
+  seasonName      String?          // Ramadan, Regular, Hajj Peak
+  costPrice       Float
+  sellingPrice    Float
+  isAvailable     Boolean          @default(true)
+  isDeleted       Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([hotelId])
+  @@index([roomType])
+}
+
+model HotelBooking {
+  id                 String          @id @default(uuid())
+  hotelId            String
+  hotel              Hotel           @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  customerId         String
+  customer           Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  supplierId         String
+  supplier           Supplier        @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  roomType           String          // DOUBLE, TRIPLE, QUAD, QUINT, SHARING
+  numberOfRooms      Int             @default(1)
+  checkInDate        DateTime
+  checkOutDate       DateTime
+  totalNights        Int
+  confirmationNumber String?
+  costPrice          Float
+  sellingPrice       Float
+  profit             Float           @default(0.0)
+  branchId           String?
+  branch             Branch?         @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  status             String          @default("CONFIRMED") // CONFIRMED, CANCELLED, REFUNDED
+  isDeleted          Boolean         @default(false)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@index([hotelId])
+  @@index([customerId])
+  @@index([branchId])
+  @@index([status])
+}
+
+model Package {
+  id                String           @id @default(uuid())
+  name              String
+  packageType       String           @default("UMRAH") // HAJJ, UMRAH, RAMADAN, CUSTOM
+  durationDays      Int
+  makkahHotelId     String
+  makkahHotel       Hotel            @relation("MakkahHotel", fields: [makkahHotelId], references: [id], onDelete: Cascade)
+  makkahNights      Int
+  madinahHotelId    String
+  madinahHotel      Hotel            @relation("MadinahHotel", fields: [madinahHotelId], references: [id], onDelete: Cascade)
+  madinahNights     Int
+  mealPlan          String           @default("BED_AND_BREAKFAST") // ROOM_ONLY, BED_AND_BREAKFAST, HALF_BOARD, FULL_BOARD
+  transportIncluded Boolean          @default(true)
+  transportType     String           @default("BUS_VIP") // PRIVATE_GMC, BUS_VIP, SHARING_COASTER
+  visaIncluded      Boolean          @default(true)
+  zyaratIncluded    Boolean          @default(true)
+  airlineId         String?
+  airline           Airline?         @relation(fields: [airlineId], references: [id], onDelete: SetNull)
+  flightId          String?
+  flight            Flight?          @relation(fields: [flightId], references: [id], onDelete: SetNull)
+  groupId           String?
+  group             Group?           @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  costDouble        Float            @default(0.0)
+  sellDouble        Float            @default(0.0)
+  costTriple        Float            @default(0.0)
+  sellTriple        Float            @default(0.0)
+  costQuad          Float            @default(0.0)
+  sellQuad          Float            @default(0.0)
+  costQuint         Float            @default(0.0)
+  sellQuint         Float            @default(0.0)
+  childPrice        Float            @default(0.0)
+  infantPrice       Float            @default(0.0)
+  description       String?
+  isDeleted         Boolean          @default(false)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  packageBookings   PackageBooking[]
+
+  @@index([packageType])
+  @@index([isDeleted])
+}
+
+model PackageBooking {
+  id              String           @id @default(uuid())
+  bookingNumber   String           @unique // e.g. PKG-2026-0001
+  packageId       String
+  package         Package          @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  customerId      String
+  customer        Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  branchId        String?
+  branch          Branch?          @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  createdById     String?
+  createdBy       User?            @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  roomType        String           @default("QUAD")
+  totalPilgrims   Int              @default(1)
+  totalAmount     Float
+  paidAmount      Float            @default(0.0)
+  balanceAmount   Float
+  bookingStatus   String           @default("DRAFT") // DRAFT, CONFIRMED, VISA_PROCESSING, TICKETED, DEPARTED, COMPLETED, CANCELLED
+  paymentStatus   String           @default("UNPAID") // UNPAID, PARTIAL, PAID
+  travelDate      DateTime
+  notes           String?
+  isDeleted       Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  pilgrims        Pilgrim[]
+  receipts        Receipt[]
+  nusukRecords    Nusuk[]
+
+  @@index([bookingNumber])
+  @@index([customerId])
+  @@index([branchId])
+  @@index([bookingStatus])
+}
+
+model Pilgrim {
+  id               String          @id @default(uuid())
+  packageBookingId String
+  packageBooking   PackageBooking  @relation(fields: [packageBookingId], references: [id], onDelete: Cascade)
+  customerId       String
+  customer         Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  passportId       String?
+  passport         Passport?       @relation(fields: [passportId], references: [id], onDelete: SetNull)
+  relationToHead   String          @default("SELF") // SELF, SPOUSE, SON, DAUGHTER, FATHER, MOTHER, OTHER
+  roomType         String          @default("QUAD")
+  isChild          Boolean         @default(false)
+  isInfant         Boolean         @default(false)
+  visaStatus       String          @default("PENDING") // PENDING, PROCESSING, APPROVED, REJECTED
+  nusukStatus      String          @default("PENDING") // PENDING, ISSUED
+  ticketStatus     String          @default("PENDING") // PENDING, ISSUED
+  isDeleted        Boolean         @default(false)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  visas            Visa[]
+  nusukRecords     Nusuk[]
+
+  @@index([packageBookingId])
+  @@index([customerId])
+}
+
+model Visa {
+  id              String           @id @default(uuid())
+  pilgrimId       String?
+  pilgrim         Pilgrim?         @relation(fields: [pilgrimId], references: [id], onDelete: SetNull)
+  customerId      String
+  customer        Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  passportId      String?
+  passport        Passport?        @relation(fields: [passportId], references: [id], onDelete: SetNull)
+  supplierId      String?
+  supplier        Supplier?        @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  visaType        String           @default("UMRAH") // UMRAH, HAJJ, TOURIST, WORK
+  applicationDate DateTime         @default(now())
+  approvalDate    DateTime?
+  expiryDate      DateTime?
+  visaNumber      String?
+  status          String           @default("SUBMITTED") // SUBMITTED, PROCESSING, APPROVED, REJECTED, STAMPED
+  costPrice       Float            @default(0.0)
+  sellingPrice    Float            @default(0.0)
+  remarks         String?
+  isDeleted       Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([customerId])
+  @@index([visaNumber])
+  @@index([status])
+}
+
+model Nusuk {
+  id                 String          @id @default(uuid())
+  pilgrimId          String?
+  pilgrim            Pilgrim?        @relation(fields: [pilgrimId], references: [id], onDelete: SetNull)
+  customerId         String
+  customer           Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  nusukRefId         String?
+  umrahPermitStatus  String          @default("PENDING") // PENDING, APPROVED, REJECTED
+  rawdahPermitStatus String          @default("PENDING") // PENDING, APPROVED, REJECTED
+  rawdahSlotDate     DateTime?
+  packageBookingId   String?
+  packageBooking     PackageBooking? @relation(fields: [packageBookingId], references: [id], onDelete: SetNull)
+  remarks            String?
+  isDeleted          Boolean         @default(false)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@index([customerId])
+  @@index([nusukRefId])
+}
+
+model Account {
+  id              String           @id @default(uuid())
+  code            String           @unique // e.g. 1001, 1002, 2001, 3001, 4001, 5001
+  name            String
+  type            String           // ASSET, LIABILITY, EQUITY, REVENUE, EXPENSE
+  subType         String           // CASH, BANK, RECEIVABLE, PAYABLE, SALES, COST_OF_SALES, OPERATING_EXPENSE
+  currency        String           @default("PKR") // PKR, SAR, USD
+  balance         Float            @default(0.0)
+  branchId        String?
+  branch          Branch?          @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  isDeleted       Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  ledgerEntries   LedgerEntry[]
+  payments        Payment[]
+  receipts        Receipt[]
+  expenses        Expense[]
+
+  @@index([code])
+  @@index([type])
+  @@index([branchId])
+}
+
+model JournalEntry {
+  id              String           @id @default(uuid())
+  entryNumber     String           @unique // e.g. JV-2026-0001
+  date            DateTime         @default(now())
+  description     String
+  referenceType   String           // BOOKING, TICKET, HOTEL, VISA, PAYMENT, RECEIPT, REFUND, EXPENSE
+  referenceId     String?
+  branchId        String?
+  branch          Branch?          @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  createdById     String?
+  createdBy       User?            @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  isDeleted       Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  ledgerEntries   LedgerEntry[]
+
+  @@index([entryNumber])
+  @@index([date])
+  @@index([referenceType, referenceId])
+}
+
+model LedgerEntry {
+  id              String           @id @default(uuid())
+  journalEntryId  String
+  journalEntry    JournalEntry     @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  accountId       String
+  account         Account          @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  debit           Float            @default(0.0)
+  credit          Float            @default(0.0)
+  balance         Float            @default(0.0)
+  currency        String           @default("PKR")
+  exchangeRate    Float            @default(1.0)
+  description     String?
+  customerId      String?
+  customer        Customer?        @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  supplierId      String?
+  supplier        Supplier?        @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  createdAt       DateTime         @default(now())
+
+  @@index([journalEntryId])
+  @@index([accountId])
+  @@index([customerId])
+  @@index([supplierId])
+}
+
+model Payment {
+  id              String           @id @default(uuid())
+  paymentNumber   String           @unique // PV-2026-0001
+  date            DateTime         @default(now())
+  supplierId      String
+  supplier        Supplier         @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  accountId       String
+  account         Account          @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  amount          Float
+  currency        String           @default("PKR")
+  exchangeRate    Float            @default(1.0)
+  paymentMethod   String           @default("BANK_TRANSFER") // CASH, BANK_TRANSFER, CHEQUE, ONLINE
+  reference       String?
+  notes           String?
+  branchId        String?
+  branch          Branch?          @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  createdById     String?
+  createdBy       User?            @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  isDeleted       Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([paymentNumber])
+  @@index([supplierId])
+  @@index([branchId])
+}
+
+model Receipt {
+  id               String          @id @default(uuid())
+  receiptNumber    String          @unique // RV-2026-0001
+  date             DateTime        @default(now())
+  customerId       String
+  customer         Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  accountId        String
+  account          Account         @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  packageBookingId String?
+  packageBooking   PackageBooking? @relation(fields: [packageBookingId], references: [id], onDelete: SetNull)
+  amount           Float
+  currency         String          @default("PKR")
+  exchangeRate     Float           @default(1.0)
+  paymentMethod    String          @default("CASH") // CASH, BANK_TRANSFER, CHEQUE, ONLINE
+  reference        String?
+  notes            String?
+  branchId         String?
+  branch           Branch?         @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  createdById      String?
+  createdBy        User?           @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  isDeleted        Boolean         @default(false)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@index([receiptNumber])
+  @@index([customerId])
+  @@index([packageBookingId])
+  @@index([branchId])
+}
+
+model Refund {
+  id                   String      @id @default(uuid())
+  refundNumber         String      @unique // RF-2026-0001
+  date                 DateTime    @default(now())
+  module               String      // TICKET, HOTEL, PACKAGE, VISA
+  referenceId          String
+  customerId           String
+  customer             Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  supplierId           String?
+  supplier             Supplier?   @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  originalAmount       Float
+  penaltyAirline       Float       @default(0.0)
+  penaltySupplier      Float       @default(0.0)
+  penaltyCompany       Float       @default(0.0)
+  customerRefundAmount Float
+  supplierRefundAmount Float       @default(0.0)
+  status               String      @default("REQUESTED") // REQUESTED, APPROVED, REFUNDED, REJECTED
+  notes                String?
+  branchId             String?
+  branch               Branch?     @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  approvedById         String?
+  approvedBy           User?       @relation("RefundApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  isDeleted            Boolean     @default(false)
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+
+  @@index([refundNumber])
+  @@index([customerId])
+  @@index([status])
+  @@index([branchId])
+}
+
+model Expense {
+  id              String           @id @default(uuid())
+  expenseNumber   String           @unique // EX-2026-0001
+  date            DateTime         @default(now())
+  accountId       String
+  account         Account          @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  title           String
+  category        String           // UTILITIES, RENT, SALARY, MARKETING, OFFICE, TRAVEL, OTHER
+  amount          Float
+  currency        String           @default("PKR")
+  paymentMethod   String           @default("CASH")
+  branchId        String?
+  branch          Branch?          @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  paidTo          String?
+  receiptsUrl     String?
+  createdById     String?
+  createdBy       User?            @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  isDeleted       Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([expenseNumber])
+  @@index([category])
+  @@index([branchId])
+}
+
+model Notification {
+  id              String           @id @default(uuid())
+  userId          String?
+  user            User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title           String
+  message         String
+  type            String           @default("GENERAL") // PASSPORT_EXPIRY, GROUP_DEADLINE, PAYMENT_DUE, VISA_STATUS, REFUND_REQUEST, GENERAL
+  isRead          Boolean          @default(false)
+  linkUrl         String?
+  createdAt       DateTime         @default(now())
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([type])
+}
+
+model AuditLog {
+  id              String           @id @default(uuid())
+  userId          String?
+  user            User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action          String           // CREATE, UPDATE, DELETE, LOGIN, APPROVE, REFUND
+  entity          String           // User, Customer, Ticket, HotelBooking, PackageBooking, Payment, etc.
+  entityId        String?
+  branchId        String?
+  branch          Branch?          @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  details         String?          // JSON metadata or description
+  ipAddress       String?
+  createdAt       DateTime         @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([entity])
+  @@index([branchId])
+  @@index([createdAt])
+}
