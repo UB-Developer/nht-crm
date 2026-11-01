@@ -74,7 +74,7 @@ Built with Next.js 14+ App Router, TypeScript, Tailwind CSS, shadcn/ui, Prisma O
 
 ### Step 1 — Clone & Install
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/UB-Developer/nht-crm
 cd next-crm
 npm install
 ```
